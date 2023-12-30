@@ -18,7 +18,7 @@
 
   <arg name="model_file" default="$(find-pkg-share dallara_description)/urdf/dallara.xacro" description="path to the file of model settings (*.xacro)"/>
   <node name="robot_state_publisher" pkg="robot_state_publisher" exec="robot_state_publisher">
-      <param name="robot_description" value="$(command 'xacro $(var model_file)' 'warn')"/>
+    <param name="robot_description" value="$(command 'xacro $(var model_file)' 'warn')"/>
   </node>
   <node pkg="dallara_interface" exec="dallara_interface_node" name="dallara_interface" output="screen"/>
 
@@ -28,7 +28,7 @@
     <node pkg="topic_tools" exec="relay" name="relay" output="screen">
       <param name="input_topic" value="/awsim/ground_truth/localization/kinematic_state"/>
       <param name="output_topic" value="/localization/kinematic_state"/>
-     </node>
+    </node>
     <node pkg="odom2tf" exec="odom2tf_node" name="odom2tf" output="screen">
       <remap from="in_odom" to="/awsim/ground_truth/localization/kinematic_state"/>
       <remap from="out_twist" to="/localization/twist_estimator/twist_with_covariance"/>
@@ -76,7 +76,7 @@
         <param name="viewer_frame" value="viewer" />
         <extra_arg name="use_intra_process_comms" value="false" />
       </composable_node>
-     
+
     </node_container>
   </group> <!-- map -->
 
@@ -225,7 +225,35 @@
         <remap from="input" to="/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id"/>
         <remap from="output" to="/planning/scenario_planning/trajectory"/>
       </node>
+      <!-- velocity planning with max velocity, acceleration, jerk, stop point constraint -->
+      <group>
+        <!-- external velocity limit selector -->
+        <group>
+          <include file="$(find-pkg-share external_velocity_limit_selector)/launch/external_velocity_limit_selector.launch.xml"/>
+        </group>
 
+        <!-- motion velocity smoother -->
+        <group>
+          <!-- common param -->
+          <!-- debug flags -->
+          <arg name="smoother_type" default="JerkFiltered"/>
+          <!-- Analytical, JerkFiltered, L2, or Linf -->
+          <node pkg="motion_velocity_smoother" exec="motion_velocity_smoother" name="motion_velocity_smoother" output="screen">
+            <param from="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml"/>
+            <param from="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/nearest_search.param.yaml"/>
+            <param from="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/motion_velocity_smoother/motion_velocity_smoother.param.yaml"/>
+            <param from="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/motion_velocity_smoother/$(var smoother_type).param.yaml"/>
+            <param name="publish_debug_trajs" value="false"/>
+            <param name="algorithm_type" value="$(var smoother_type)"/>
+            <remap from="~/input/trajectory" to="/planning/scenario_planning/trajectory"/>
+            <remap from="~/output/trajectory" to="/planning/trajectory"/>
+            <remap from="~/input/external_velocity_limit_mps" to="/planning/scenario_planning/max_velocity"/>
+            <!-- Topic for setting maximum speed from the outside (input topic) -->
+            <remap from="~/output/current_velocity_limit_mps" to="/planning/scenario_planning/current_max_velocity"/>
+            <!-- Topic for displaying the set maximum speed (output topic) -->
+          </node>
+        </group>
+      </group>
     </group>
   </group>
 
@@ -235,9 +263,9 @@
     <param name="lookahead_gain" value="0.4"/>
     <param name="lookahead_min_distance" value="5.0"/>
     <param name="speed_proportional_gain" value="1.0"/>
-    
+
     <remap from="input/kinematics" to="/localization/kinematic_state"/>
-    <remap from="input/trajectory" to="/planning/scenario_planning/trajectory"/>
+    <remap from="input/trajectory" to="/planning/trajectory"/>
     <remap from="output/control_cmd" to="/control/command/control_cmd"/>
   </node>
 
@@ -246,7 +274,7 @@
     <arg name="max_throttle" value="1.0"/>
     <arg name="max_brake" value="1.0"/>
     <arg name="max_steer" value="300.0"/>
-    <arg name="min_steer" value="-300.0"/>    
+    <arg name="min_steer" value="-300.0"/>
     <arg name="csv_path_accel_map" value="$(find-pkg-share dallara_launch)/config/accel_map.csv"/>
     <arg name="csv_path_brake_map" value="$(find-pkg-share dallara_launch)/config/brake_map.csv"/>
     <arg name="convert_accel_cmd" value="true" />
